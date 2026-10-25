@@ -1,0 +1,43 @@
+{
+  "config": {
+    "step": { "user": { "title": "Duke Energy R-TOU-CPP", "description": "Adds the time-of-use tier and price for Duke Energy Progress (NC) Schedule R-TOU-CPP. Prices can be adjusted afterwards under Configure." } },
+    "abort": { "single_instance_allowed": "Already configured." }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Rates (cents per kWh)",
+        "data": {
+          "critical_peak_cents": "Critical peak",
+          "on_peak_cents": "On-peak",
+          "off_peak_cents": "Off-peak",
+          "discount_cents": "Discount",
+          "adder_cents": "All-in adder (riders, REPS, storm charge, tax)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "tier": { "name": "Tier", "state": { "discount": "Discount", "off_peak": "Off-peak", "on_peak": "On-peak", "critical_peak": "Critical peak" } },
+      "price": { "name": "Price" },
+      "next_change": { "name": "Next change" },
+      "next_tier": { "name": "Next tier", "state": { "discount": "Discount", "off_peak": "Off-peak", "on_peak": "On-peak", "critical_peak": "Critical peak" } }
+    },
+    "binary_sensor": {
+      "critical_peak_active": { "name": "Critical peak active" },
+      "critical_peak_flagged": { "name": "Critical peak today or tomorrow" }
+    },
+    "switch": {
+      "critical_peak_today": { "name": "Critical peak today" },
+      "critical_peak_tomorrow": { "name": "Critical peak tomorrow" }
+    },
+    "select": {
+      "critical_peak_shift": { "name": "Critical peak window", "state": { "earlier": "One hour earlier", "standard": "Standard", "later": "One hour later" } }
+    }
+  },
+  "services": {
+    "set_critical_peak": { "name": "Set critical peak day", "description": "Flag a date as a critical peak day.", "fields": { "date": { "name": "Date", "description": "The critical peak day." }, "shift_hours": { "name": "Shift (hours)", "description": "-1 or 1 if Duke moved the window; defaults to the Critical peak window selector." } } },
+    "clear_critical_peak": { "name": "Clear critical peak day", "description": "Remove a critical peak flag.", "fields": { "date": { "name": "Date", "description": "The date to clear." } } }
+  }
+}

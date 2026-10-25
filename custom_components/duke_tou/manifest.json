@@ -1,0 +1,13 @@
+{
+  "domain": "duke_tou",
+  "name": "Duke Energy Time-of-Use (R-TOU-CPP)",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/pshanesmith/ha-duke-tou",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/pshanesmith/ha-duke-tou/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.1.0"
+}
