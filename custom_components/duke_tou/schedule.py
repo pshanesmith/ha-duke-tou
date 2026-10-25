@@ -18,7 +18,9 @@ ON_PEAK = "on_peak"
 CRITICAL_PEAK = "critical_peak"
 TIERS = (DISCOUNT, OFF_PEAK, ON_PEAK, CRITICAL_PEAK)
 
-BUNDLED_TARIFF = Path(__file__).parent / "tariffs" / "duke_progress_nc_r_tou_cpp.toml"
+TARIFF_DIR = Path(__file__).parent / "tariffs"
+DEFAULT_TARIFF = "duke_progress_nc_r_tou_cpp"
+BUNDLED_TARIFF = TARIFF_DIR / f"{DEFAULT_TARIFF}.toml"
 
 _WEEKDAYS = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
 _DAY_KINDS = ("all", "weekdays", "weekdays_no_holidays")
@@ -102,7 +104,8 @@ class Tariff:
     seasons: Mapping[str, tuple[int, ...]]
     periods: tuple[Period, ...]
     default_tier: str
-    critical_replaces: str
+    critical_replaces: str | None  # None: the plan has no critical peak days
+    labels: Mapping[str, str]  # display names, e.g. off_peak -> "Standard"
     max_shift_hours: int
     critical_days_per_year: int
     observed: str
@@ -171,6 +174,20 @@ class Tariff:
             if self._applies(p, d) and any(s <= hour < e for s, e in p.hours.get(season, ())):
                 return p.tier
         return self.default_tier
+
+    @property
+    def has_critical(self) -> bool:
+        return self.critical_replaces is not None
+
+    @property
+    def used_tiers(self) -> tuple[str, ...]:
+        used = {self.default_tier, *(p.tier for p in self.periods)}
+        if self.has_critical:
+            used.add(CRITICAL_PEAK)
+        return tuple(t for t in TIERS if t in used)
+
+    def label(self, tier: str) -> str:
+        return self.labels.get(tier) or tier.replace("_", " ").capitalize()
 
     def critical_window(self, d: date, shift: int = 0) -> Ranges:
         """Hours billed as critical peak on a flagged day, shifted by `shift`."""
@@ -275,14 +292,6 @@ def _ranges(value: Any, where: str) -> Ranges:
 def parse_tariff(raw: Mapping[str, Any]) -> Tariff:
     name = str(raw.get("name", "tariff"))
 
-    rates_raw = _need(raw, "rates", "tariff")
-    rates = {}
-    for tier in TIERS:
-        v = _need(rates_raw, tier, "[rates]")
-        if isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0:
-            raise TariffError(f"[rates] {tier} must be a non-negative number, got {v!r}")
-        rates[tier] = round(v / 100, 6)
-
     seasons_raw = _need(raw, "seasons", "tariff")
     seasons: dict[str, tuple[int, ...]] = {}
     seen: dict[int, str] = {}
@@ -320,21 +329,43 @@ def parse_tariff(raw: Mapping[str, Any]) -> Tariff:
     if default_tier not in TIERS or default_tier == CRITICAL_PEAK:
         raise TariffError(f"default_tier must be one of {[t for t in TIERS if t != CRITICAL_PEAK]}")
 
-    cp = _need(raw, "critical_peak", "tariff")
-    replaces = _need(cp, "replaces", "[critical_peak]")
-    target = [p for p in periods if p.tier == replaces]
-    if not target:
-        raise TariffError(f"[critical_peak] replaces '{replaces}', which has no period")
-    max_shift = _int(_need(cp, "max_shift_hours", "[critical_peak]"), "max_shift_hours", 0, 12)
-    per_year = _int(cp.get("days_per_year", 0), "days_per_year", 0, 366)
-    for p in target:
-        for sname, rs in p.hours.items():
-            for s, e in rs:
-                if s - max_shift < 0 or e + max_shift > 24:
-                    raise TariffError(
-                        f"[critical_peak] shifting {replaces} {sname} hours by "
-                        f"{max_shift} would leave the 0-24 day"
-                    )
+    cp = raw.get("critical_peak")
+    if cp is None:
+        replaces, max_shift, per_year = None, 0, 0
+    else:
+        replaces = _need(cp, "replaces", "[critical_peak]")
+        target = [p for p in periods if p.tier == replaces]
+        if not target:
+            raise TariffError(f"[critical_peak] replaces '{replaces}', which has no period")
+        max_shift = _int(_need(cp, "max_shift_hours", "[critical_peak]"), "max_shift_hours", 0, 12)
+        per_year = _int(cp.get("days_per_year", 0), "days_per_year", 0, 366)
+        for p in target:
+            for sname, rs in p.hours.items():
+                for s, e in rs:
+                    if s - max_shift < 0 or e + max_shift > 24:
+                        raise TariffError(
+                            f"[critical_peak] shifting {replaces} {sname} hours by "
+                            f"{max_shift} would leave the 0-24 day"
+                        )
+
+    used = {default_tier, *(p.tier for p in periods)}
+    if replaces:
+        used.add(CRITICAL_PEAK)
+    rates_raw = raw.get("rates", {})
+    rates = {}
+    for tier in TIERS:
+        if tier in used:
+            v = _need(rates_raw, tier, "[rates]")
+        else:
+            v = rates_raw.get(tier, 0)
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0:
+            raise TariffError(f"[rates] {tier} must be a non-negative number, got {v!r}")
+        rates[tier] = round(v / 100, 6)
+
+    labels = dict(raw.get("labels", {}))
+    for tier, text in labels.items():
+        if tier not in TIERS or not isinstance(text, str) or not text:
+            raise TariffError(f"[labels] {tier!r} must be one of {list(TIERS)} with a text value")
 
     hol = raw.get("holidays", {})
     observed = hol.get("observed", "none")
@@ -381,6 +412,7 @@ def parse_tariff(raw: Mapping[str, Any]) -> Tariff:
         periods=tuple(periods),
         default_tier=default_tier,
         critical_replaces=replaces,
+        labels=labels,
         max_shift_hours=max_shift,
         critical_days_per_year=per_year,
         observed=observed,

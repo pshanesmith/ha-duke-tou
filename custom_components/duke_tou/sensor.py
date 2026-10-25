@@ -33,13 +33,18 @@ class TierSensor(TouEntity, SensorEntity):
     def extra_state_attributes(self):
         m = self.manager
         today = m.today()
-        return {
+        attrs = {
+            "label": m.tariff.label(m.tier()),
             "season": m.tariff.season(today),
             "holiday": m.tariff.holiday_name(today),
-            "critical_days_used_this_year": m.days_used_this_year(),
-            "critical_days_per_year": m.tariff.critical_days_per_year,
-            "flagged_critical_days": m.upcoming_critical(),
         }
+        if m.tariff.has_critical:
+            attrs.update(
+                critical_days_used_this_year=m.days_used_this_year(),
+                critical_days_per_year=m.tariff.critical_days_per_year,
+                flagged_critical_days=m.upcoming_critical(),
+            )
+        return attrs
 
 
 class PriceSensor(TouEntity, SensorEntity):

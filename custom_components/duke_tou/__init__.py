@@ -8,9 +8,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_time_change
 
 from .const import (
+    CONF_TARIFF,
     DOMAIN,
     PLATFORMS,
     SERVICE_CLEAR_CRITICAL,
@@ -19,13 +21,16 @@ from .const import (
     tariff_path,
 )
 from .manager import TouManager
-from .schedule import TariffError, load_tariff
+from .schedule import DEFAULT_TARIFF, TariffError, load_tariff
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     try:
-        tariff = await hass.async_add_executor_job(load_tariff, tariff_path(hass))
-    except TariffError as err:
+        stem = entry.data.get(CONF_TARIFF, DEFAULT_TARIFF)
+        tariff = await hass.async_add_executor_job(
+            lambda: load_tariff(tariff_path(hass, stem))
+        )
+    except (TariffError, FileNotFoundError) as err:
         raise ConfigEntryError(f"Invalid tariff: {err}") from err
     manager = TouManager(hass, tariff, rates_from_options(tariff, dict(entry.options)))
     await manager.async_load()
@@ -49,7 +54,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def clear_critical(call: ServiceCall) -> None:
         await _manager().async_clear_critical(call.data["date"])
 
-    if not hass.services.has_service(DOMAIN, SERVICE_SET_CRITICAL):
+    if tariff.has_critical and not hass.services.has_service(DOMAIN, SERVICE_SET_CRITICAL):
         hass.services.async_register(
             DOMAIN,
             SERVICE_SET_CRITICAL,
@@ -67,6 +72,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             clear_critical,
             schema=vol.Schema({vol.Required("date"): cv.date}),
         )
+
+    if not tariff.has_critical:
+        # Switching to a plan without critical peak days leaves the old
+        # override entities behind in the registry.
+        registry = er.async_get(hass)
+        for reg in er.async_entries_for_config_entry(registry, entry.entry_id):
+            if "_critical_peak_" in reg.unique_id:
+                registry.async_remove(reg.entity_id)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

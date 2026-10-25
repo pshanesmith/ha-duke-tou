@@ -10,6 +10,8 @@ from .entity import TouEntity
 
 async def async_setup_entry(hass, entry, async_add_entities):
     m = hass.data[DOMAIN][entry.entry_id]
+    if not m.tariff.has_critical:
+        return
     async_add_entities(
         [
             CriticalDaySwitch(m, entry.entry_id, "critical_peak_today", 0),

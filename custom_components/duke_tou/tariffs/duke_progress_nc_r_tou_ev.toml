@@ -1,0 +1,26 @@
+# Duke Energy Progress (North Carolina) Schedule R-TOU-EV (pilot, time of use with discount charging period)
+# NC First Revised Leaf No. 504, effective for service on and after 2026-01-01.
+# https://www.duke-energy.com/-/media/pdfs/for-your-home/rates/dep-nc/leaf-no-504-schedule-r-tou-ev.pdf
+#
+# See duke_progress_nc_r_tou_cpp.toml for notes on editing and overriding tariffs.
+# The plan has two prices, "Standard" and "Discount", with the same hours every day
+# of the year (no weekends, holidays or seasons). Standard is stored as off_peak.
+
+name = "Duke Energy R-TOU-EV"
+default_tier = "off_peak"
+
+[labels]
+off_peak = "Standard"
+
+[rates]
+off_peak = 13.096
+discount = 6.548
+
+[seasons]
+all_year = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
+# 11 pm to 5 am, written as two ranges because a range cannot cross midnight.
+[[periods]]
+tier = "discount"
+days = "all"
+hours = { all_year = [[0, 5], [23, 24]] }

@@ -4,10 +4,11 @@ from pathlib import Path
 
 from homeassistant.core import HomeAssistant
 
-from .schedule import BUNDLED_TARIFF, CRITICAL_PEAK, DISCOUNT, OFF_PEAK, ON_PEAK, Rates, Tariff
+from .schedule import DEFAULT_TARIFF, TARIFF_DIR, CRITICAL_PEAK, DISCOUNT, OFF_PEAK, ON_PEAK, Rates, Tariff
 
 DOMAIN = "duke_tou"
 PLATFORMS = ["sensor", "binary_sensor", "switch", "select"]
+
 
 TIER_OPTIONS = [DISCOUNT, OFF_PEAK, ON_PEAK, CRITICAL_PEAK]
 
@@ -37,7 +38,25 @@ def rates_from_options(tariff: Tariff, options: dict) -> Rates:
     return replace(tariff.rates, adder=round(options.get(CONF_ADDER, 0.0) / 100, 6), **overrides)
 
 
-def tariff_path(hass: HomeAssistant) -> Path:
-    """A tariff in <config>/duke_tou/tariff.toml replaces the bundled one."""
-    custom = Path(hass.config.path(DOMAIN, "tariff.toml"))
-    return custom if custom.is_file() else BUNDLED_TARIFF
+CONF_TARIFF = "tariff"
+
+
+def _custom_dir(hass: HomeAssistant) -> Path:
+    return Path(hass.config.path(DOMAIN))
+
+
+def list_tariffs(hass: HomeAssistant) -> dict[str, Path]:
+    """Plan file stems to paths: bundled plans, plus any *.toml in
+    <config>/duke_tou/, which replaces a bundled plan of the same name."""
+    out = {p.stem: p for p in sorted(TARIFF_DIR.glob("*.toml"))}
+    custom = _custom_dir(hass)
+    if custom.is_dir():
+        out.update({p.stem: p for p in sorted(custom.glob("*.toml"))})
+    return out
+
+
+def tariff_path(hass: HomeAssistant, stem: str = DEFAULT_TARIFF) -> Path:
+    try:
+        return list_tariffs(hass)[stem]
+    except KeyError:
+        raise FileNotFoundError(f"no tariff named {stem!r}") from None

@@ -2,11 +2,12 @@
 # NC Second Revised Leaf No. 503, effective for service on and after 2025-10-01.
 # https://www.duke-energy.com/-/media/pdfs/for-your-home/rates/dep-nc/leaf-no-503-schedule-r-tou-cpp.pdf
 #
-# To change the tariff, edit a copy at <home assistant config>/duke_tou/tariff.toml;
-# that file is used instead of this one when it exists. Restart (or reload the
-# integration) afterwards. Tier names are fixed: critical_peak, on_peak, off_peak, discount.
+# To change a tariff, copy it to <home assistant config>/duke_tou/ under the same
+# file name and edit the copy; it is used instead of the bundled one. Reload the
+# integration afterwards. Tier names are fixed: critical_peak, on_peak, off_peak,
+# discount. A file with a different name there shows up as an extra plan choice.
 
-name = "Duke Energy Progress NC R-TOU-CPP"
+name = "Duke Energy R-TOU-CPP"
 
 # Billed for every hour no period matches. Top-level keys must stay above the
 # first [table], or TOML files them under that table.

@@ -19,9 +19,9 @@ class TouEntity(Entity):
         self._attr_translation_key = key
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry_id)},
-            name="Duke Energy R-TOU-CPP",
+            name=manager.tariff.name,
             manufacturer="Duke Energy Progress",
-            model="Schedule R-TOU-CPP (NC)",
+            model="Time-of-use tariff",
         )
 
     async def async_added_to_hass(self) -> None:

@@ -218,3 +218,70 @@ def test_load_errors(tmp_path):
     bad.write_text("this is = = not toml")
     with pytest.raises(s.TariffError, match="invalid TOML"):
         s.load_tariff(bad)
+
+
+# --- the other bundled plans -------------------------------------------------------
+
+def plan(stem):
+    return s.load_tariff(s.TARIFF_DIR / f"{stem}.toml")
+
+
+def test_all_bundled_plans_load():
+    stems = sorted(p.stem for p in s.TARIFF_DIR.glob("*.toml"))
+    assert stems == [
+        "duke_progress_nc_r_tou",
+        "duke_progress_nc_r_tou_cpp",
+        "duke_progress_nc_r_tou_ev",
+        "duke_progress_nc_r_toud",
+    ]
+    for stem in stems:
+        assert plan(stem).name.startswith("Duke Energy R-TOU")
+
+
+def test_r_tou_and_r_toud_share_the_cpp_schedule_without_critical_peak():
+    for stem, rates in (
+        ("duke_progress_nc_r_tou", (0.29905, 0.11321, 0.07372)),
+        ("duke_progress_nc_r_toud", (0.15638, 0.06633, 0.04347)),
+    ):
+        t = plan(stem)
+        assert not t.has_critical and t.used_tiers == (s.DISCOUNT, s.OFF_PEAK, s.ON_PEAK)
+        assert (t.rates.on_peak, t.rates.off_peak, t.rates.discount) == rates
+        for month, day, hour in [(7, 15, h) for h in range(24)] + [(10, 26, h) for h in range(24)]:
+            assert t.base_tier(date(2026, month, day), hour) == T.base_tier(date(2026, month, day), hour)
+        # a flagged day is ignored when the plan has no critical peak
+        assert t.tier_at(at(2026, 7, 15, 19), {date(2026, 7, 15): 0}) == s.ON_PEAK
+        assert t.holiday_name(date(2026, 11, 26)) == "Thanksgiving Day"
+
+
+def test_ev_plan_is_two_tiers_all_year_with_no_holidays():
+    t = plan("duke_progress_nc_r_tou_ev")
+    assert t.used_tiers == (s.DISCOUNT, s.OFF_PEAK) and t.label(s.OFF_PEAK) == "Standard"
+    assert t.label(s.DISCOUNT) == "Discount"
+    for month in (1, 7):
+        d = date(2026, month, 14)
+        assert [t.base_tier(d, h) for h in (22, 23, 0, 4, 5, 6)] == [
+            s.OFF_PEAK, s.DISCOUNT, s.DISCOUNT, s.DISCOUNT, s.OFF_PEAK, s.OFF_PEAK
+        ]
+    assert not t.holiday_dates(2026)
+    assert t.rates.off_peak == 0.13096 and t.rates.discount == 0.06548
+    nxt, tier = t.next_change(at(2026, 10, 26, 22, 30))
+    assert (nxt.hour, tier) == (23, s.DISCOUNT)
+    nxt, tier = t.next_change(at(2026, 10, 26, 23, 30))
+    assert (nxt.day, nxt.hour, tier) == (27, 5, s.OFF_PEAK)
+
+
+def test_rate_required_only_for_used_tiers():
+    raw = copy.deepcopy(RAW)
+    raw.pop("critical_peak")
+    raw["rates"].pop("critical_peak")
+    assert not s.parse_tariff(raw).has_critical
+    raw["rates"].pop("on_peak")
+    with pytest.raises(s.TariffError, match="on_peak"):
+        s.parse_tariff(raw)
+
+
+def test_bad_label_rejected():
+    raw = copy.deepcopy(RAW)
+    raw["labels"] = {"bogus": "x"}
+    with pytest.raises(s.TariffError, match="labels"):
+        s.parse_tariff(raw)

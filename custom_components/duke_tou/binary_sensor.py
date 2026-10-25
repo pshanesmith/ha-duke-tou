@@ -11,6 +11,8 @@ from .schedule import CRITICAL_PEAK, format_ranges
 
 async def async_setup_entry(hass, entry, async_add_entities):
     m = hass.data[DOMAIN][entry.entry_id]
+    if not m.tariff.has_critical:
+        return
     async_add_entities([CriticalActive(m, entry.entry_id), CriticalFlagged(m, entry.entry_id)])
 
 

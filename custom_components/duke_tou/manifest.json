@@ -1,6 +1,6 @@
 {
   "domain": "duke_tou",
-  "name": "Duke Energy Time-of-Use (R-TOU-CPP)",
+  "name": "Duke Energy Time-of-Use",
   "codeowners": [],
   "config_flow": true,
   "documentation": "https://github.com/pshanesmith/ha-duke-tou",
