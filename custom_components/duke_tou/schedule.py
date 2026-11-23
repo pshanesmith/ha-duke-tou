@@ -209,6 +209,47 @@ class Tariff:
                 return CRITICAL_PEAK
         return self.base_tier(d, now.hour)
 
+    def season_hours(self, tier: str, season: str) -> Ranges:
+        """Hours of a season billed as `tier` by a period (not the default tier)."""
+        out: list[tuple[int, int]] = []
+        for p in self.periods:
+            if p.tier == tier:
+                out.extend(p.hours.get(season, ()))
+        return tuple(sorted(out))
+
+    def next_season(self, d: date) -> tuple[str, date]:
+        """The season that follows the one `d` is in, and its first day."""
+        current = self.season(d)
+        year, month = d.year, d.month
+        for _ in range(12):
+            year, month = year + (month == 12), month % 12 + 1
+            first = date(year, month, 1)
+            if self.season(first) != current:
+                return self.season(first), first
+        raise AssertionError("validated: seasons differ or the plan has one season")
+
+    def next_peak_start(
+        self,
+        now: datetime,
+        critical_days: Mapping[date, int] | None = None,
+        horizon_hours: int = 24 * 14,
+    ) -> datetime | None:
+        """The next top of the hour at which on-peak (or critical peak) begins.
+
+        Skips weekends and holidays because the tier does. Starts after the
+        current peak if one is under way. None if no peak starts within the horizon.
+        """
+        peaks = {ON_PEAK, CRITICAL_PEAK}
+        in_peak = self.tier_at(now, critical_days) in peaks
+        t = now.replace(minute=0, second=0, microsecond=0)
+        for _ in range(horizon_hours):
+            t = _add_hour(t)
+            now_peak = self.tier_at(t, critical_days) in peaks
+            if now_peak and not in_peak:
+                return t
+            in_peak = now_peak
+        return None
+
     def next_change(
         self,
         now: datetime,

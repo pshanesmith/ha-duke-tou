@@ -30,7 +30,7 @@ async def _setup(hass):
     return entry
 
 
-_DOMAINS = {"tier": "sensor", "price": "sensor", "next_tier": "sensor", "next_change": "sensor",
+_DOMAINS = {"tier": "sensor", "price": "sensor", "next_tier": "sensor", "next_change": "sensor", "season": "sensor", "next_peak_start": "sensor",
             "critical_peak_active": "binary_sensor", "critical_peak_today_or_tomorrow": "binary_sensor",
             "critical_peak_today": "switch", "critical_peak_window": "select"}
 
@@ -48,6 +48,14 @@ async def test_tier_and_price(hass, freezer: FrozenDateTimeFactory):
     assert _state(hass, "_tier").state == "discount"
     assert float(_state(hass, "_price").state) == 0.08274
     assert _state(hass, "_next_tier").state == "off_peak"
+    season = _state(hass, "_season")
+    assert season.state == "non_summer"
+    assert season.attributes["on_peak_hours"] == "06:00-09:00"
+    assert (season.attributes["on_peak_start"], season.attributes["on_peak_end"]) == ("06:00", "09:00")
+    assert season.attributes["next_season"] == "summer"
+    assert season.attributes["next_season_start"] == "2027-05-01"
+    assert season.attributes["next_season_on_peak_hours"] == "18:00-21:00"
+    assert _state(hass, "_next_peak_start").state.startswith("2026-10-27T10:00:00")
 
 
 async def test_critical_peak_override_and_hourly_tick(hass, freezer: FrozenDateTimeFactory):

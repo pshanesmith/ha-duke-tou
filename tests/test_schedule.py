@@ -121,6 +121,35 @@ def test_next_change():
     assert (t.hour, tier) == (6, s.CRITICAL_PEAK)
 
 
+def test_season_hours_and_next_season():
+    assert T.season_hours(s.ON_PEAK, "summer") == ((18, 21),)
+    assert T.season_hours(s.ON_PEAK, "non_summer") == ((6, 9),)
+    assert T.season_hours(s.DISCOUNT, "non_summer") == ((1, 3), (11, 16))
+    assert T.next_season(date(2026, 11, 23)) == ("summer", date(2027, 5, 1))
+    assert T.next_season(date(2026, 7, 15)) == ("non_summer", date(2026, 10, 1))
+
+
+def test_next_peak_start():
+    # Monday 5:30 -> today 06:00; during the peak -> tomorrow
+    assert T.next_peak_start(at(2026, 10, 26, 5, 30)).hour == 6
+    t = T.next_peak_start(at(2026, 10, 26, 7))
+    assert (t.day, t.hour) == (27, 6)
+    # Friday evening skips the weekend
+    t = T.next_peak_start(at(2026, 10, 23, 10))
+    assert (t.day, t.hour) == (26, 6)
+    # Summer peak is the evening
+    t = T.next_peak_start(at(2026, 7, 15, 10))
+    assert (t.day, t.hour) == (15, 18)
+    # Thanksgiving week: Wed night -> next weekday after Thu/Fri holidays is Monday
+    t = T.next_peak_start(at(2026, 11, 25, 10))
+    assert (t.month, t.day, t.hour) == (11, 30, 6)
+    # a flagged critical day starts at its (shifted) window
+    t = T.next_peak_start(at(2026, 10, 24, 10), {date(2026, 10, 24): 0})
+    assert (t.day, t.hour) == (26, 6)  # the flagged window already passed
+    t = T.next_peak_start(at(2026, 10, 24, 2), {date(2026, 10, 24): 1})
+    assert (t.day, t.hour) == (24, 7)
+
+
 def test_next_change_across_midnight():
     t, tier = T.next_change(at(2026, 7, 15, 22))
     assert (t.day, t.hour, tier) == (16, 1, s.DISCOUNT)

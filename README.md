@@ -32,6 +32,8 @@ The four critical peak entries below, and the services, exist only for plans wit
 | `sensor.…_tier` | `discount`, `off_peak`, `on_peak`, `critical_peak` (attributes: `label` such as "Standard", season, holiday, critical days used) |
 | `sensor.…_price` | Current USD/kWh including the adder |
 | `sensor.…_next_change`, `…_next_tier` | When and to what the tier changes next |
+| `sensor.…_season` | `summer` or `non_summer` (the plan's own season names), with attributes `on_peak_hours`, `on_peak_start`, `on_peak_end` for that season, and `next_season`, `next_season_start`, `next_season_on_peak_hours`. Use it to pick pre-heat or pre-cool hours without hard-coding them |
+| `sensor.…_next_peak_start` | When the next on-peak (or critical peak) window begins. Skips weekends and holidays, and follows a flagged critical day. Use it to start pre-heating or pre-cooling ahead of the peak |
 | `binary_sensor.…_critical_peak_active` | On during the critical window |
 | `binary_sensor.…_critical_peak_today_or_tomorrow` | On once a day is flagged, before the window starts |
 | `switch.…_critical_peak_today` / `…_tomorrow` | The manual override: flip it when Duke's notice arrives |

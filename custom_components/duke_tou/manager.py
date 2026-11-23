@@ -67,6 +67,9 @@ class TouManager:
     def next_change(self) -> tuple[datetime, str] | None:
         return self.tariff.next_change(self.now(), self.critical_days)
 
+    def next_peak_start(self) -> datetime | None:
+        return self.tariff.next_peak_start(self.now(), self.critical_days)
+
     def upcoming_critical(self) -> list[str]:
         today = self.today()
         return sorted(d.isoformat() for d in self.critical_days if d >= today)

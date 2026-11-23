@@ -59,6 +59,16 @@
       "next_change": {
         "name": "Next change"
       },
+      "season": {
+        "name": "Season",
+        "state": {
+          "summer": "Summer",
+          "non_summer": "Non-summer"
+        }
+      },
+      "next_peak_start": {
+        "name": "Next peak start"
+      },
       "next_tier": {
         "name": "Next tier",
         "state": {

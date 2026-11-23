@@ -3,6 +3,7 @@ from __future__ import annotations
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 
 from .const import DOMAIN, TIER_OPTIONS
+from .schedule import ON_PEAK, format_ranges
 from .entity import TouEntity
 
 
@@ -14,6 +15,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
             PriceSensor(m, entry.entry_id),
             NextChangeSensor(m, entry.entry_id),
             NextTierSensor(m, entry.entry_id),
+            SeasonSensor(m, entry.entry_id),
+            NextPeakStartSensor(m, entry.entry_id),
         ]
     )
 
@@ -97,3 +100,49 @@ class NextTierSensor(TouEntity, SensorEntity):
     def extra_state_attributes(self):
         nxt = self.manager.next_change()
         return {"next_price": self.manager.rates.price(nxt[1])} if nxt else {}
+
+
+class SeasonSensor(TouEntity, SensorEntity):
+    """The plan's season today, with that season's on-peak hours."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+
+    def __init__(self, manager, entry_id):
+        super().__init__(manager, entry_id, "season")
+        self._attr_options = list(manager.tariff.seasons)
+
+    @property
+    def native_value(self):
+        return self.manager.tariff.season(self.manager.today())
+
+    @property
+    def extra_state_attributes(self):
+        t = self.manager.tariff
+        today = self.manager.today()
+        season = t.season(today)
+        hours = t.season_hours(ON_PEAK, season)
+        next_season, next_start = t.next_season(today)
+        attrs = {
+            "on_peak_hours": format_ranges(hours),
+            "next_season": next_season,
+            "next_season_start": next_start.isoformat(),
+            "next_season_on_peak_hours": format_ranges(t.season_hours(ON_PEAK, next_season)),
+        }
+        if hours:
+            attrs["on_peak_start"] = f"{hours[0][0]:02d}:00"
+            attrs["on_peak_end"] = f"{hours[-1][1] % 24:02d}:00"
+        return attrs
+
+
+class NextPeakStartSensor(TouEntity, SensorEntity):
+    """When the next on-peak (or critical peak) window starts: skips weekends
+    and holidays, and follows a critical day you flagged."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, manager, entry_id):
+        super().__init__(manager, entry_id, "next_peak_start")
+
+    @property
+    def native_value(self):
+        return self.manager.next_peak_start()
